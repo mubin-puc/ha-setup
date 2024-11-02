@@ -1,0 +1,67 @@
+- name: >
+    Redis High Availability Test
+  block:
+
+    - name: >
+        stopping redis services host=[{{hostname_items}}]
+      service:
+        name: "{{redis_services_items}}"
+        state: stopped
+      vars:
+        redis_services: 
+          - redis_6379
+          - sentinel_26379
+      loop: "{{redis_services}}"
+      loop_control:
+        loop_var: redis_services_items
+      register: redis_service_stop_register
+      when: 
+        - inventory_hostname != hostname_items
+      become: true
+      
+    - name: haproxy status
+      shell: echo "show stat -1 4 -1" | socat /var/lib/haproxy/stats stdio | tail -4| cut -d "," -f 2,18 | column -s, -t
+      when:
+        - inventory_hostname == hostname_items
+      register: haproxy_status
+      until: 
+        - "hostname_items + '  ' + 'UP' in haproxy_status.stdout"
+        - "'UP 1/3' not in haproxy_status.stdout"
+      retries: 15
+      delay: 10
+      become: true
+
+    - name: >
+        starting redis services host=[{{hostname_items}}]
+      service:
+        name: "{{redis_services_items}}"
+        state: started
+      vars:
+        redis_services: 
+          - redis_6379
+          - sentinel_26379
+      loop: "{{redis_services}}"
+      loop_control:
+        loop_var: redis_services_items
+      register: redis_service_start_register
+      when: 
+        - inventory_hostname != hostname_items
+      become: true
+
+  any_errors_fatal: false
+
+  rescue:
+    - name: >
+        starting redis services host=[{{hostname_items}}]
+      service:
+        name: "{{redis_services_items}}"
+        state: started
+      vars:
+        redis_services: 
+          - redis_6379
+          - sentinel_26379
+      loop: "{{redis_services}}"
+      loop_control:
+        loop_var: redis_services_items
+      register: redis_service_start_register
+      become: true

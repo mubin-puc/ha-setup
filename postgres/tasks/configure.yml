@@ -1,0 +1,165 @@
+---
+- name: "Ensure application basedir allows dir traversal"
+  file:
+    path: "{{ application_basedir }}"
+    mode: 0755
+
+- name: "Create Postgres Dirs"
+  file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ postgres_user }}"
+    group: "{{ postgres_group }}"
+  with_items:
+    - "{{ postgres_basedir }}"
+    - "{{ postgres_datadir }}"
+
+- name: "Install psycopg2 RPM from yum"
+  yum:
+    name: "{{ postgres_psycopg_rpm_name }}" 
+    state: present
+  become: true
+
+- name: "Pull in custom systemd unit file"
+  template:
+    src: postgresql.service.j2
+    dest: /usr/lib/systemd/system/postgresql-{{ postgres_major_version }}.service
+  notify: restart postgres
+
+- name: "Determine if database has been initialized"
+  stat:
+    path: "{{ postgres_datadir }}/PG_VERSION"
+  register: pg_init
+
+- name: "Initialize Database and start service"
+  block:
+    - name: "Init database"
+      shell: "sudo -u {{ postgres_user }} {{ postgres_bin_dir }}/initdb -D {{ postgres_datadir }}"
+      args:
+        creates: "{{ postgres_datadir }}/PG_VERSION"
+      become: true
+
+    - name: "Enable and Start Postgresql service"
+      systemd:
+        name: postgresql-{{ postgres_major_version }}.service
+        state: started
+        enabled: true
+        daemon-reload: true
+
+    - name: "Set password for postgres user"
+      postgresql_user:
+        name: "{{ postgres_user }}"
+        password: "{{ postgres_admin_password }}"
+        encrypted: yes
+      delegate_to: "{{ inventory_hostname }}"
+
+    - name: "Force md5 auth for all connections"
+      replace:
+        path: "{{ postgres_datadir }}/pg_hba.conf"
+        regexp: "trust"
+        replace: "md5"
+      notify: restart postgres
+
+    - name: "Allow md5 connection for all user"
+      postgresql_pg_hba:
+        dest: "{{ postgres_datadir }}/pg_hba.conf"
+        contype: host
+        databases: all
+        users: all
+        address: all
+        method: md5
+        create: true
+      become: True
+      become_user: "{{ postgres_user }}" 
+      notify: restart postgres
+
+    - name: postgresql listen on all addresses
+      lineinfile: dest="{{ postgres_datadir }}/postgresql.conf"
+                regexp="^listen_addresses"
+                line="listen_addresses = '*'" state=present
+      become: True
+      become_user: "{{ postgres_user }}" 
+      notify: restart postgres
+
+    - name: "Create Postgres DBs and Users"
+      block:
+        - name: Create users for app
+          postgresql_user:
+            name: "{{ item.user }}"
+            password: "{{ item.pass }}"
+            encrypted: yes
+          no_log: true
+          with_items:
+            - "{{ postgres_db_users }}"
+          delegate_to: "{{ inventory_hostname }}"
+
+        - name: Create database for app
+          postgresql_db:
+            name: "{{ item.db }}"
+            owner: "{{ item.user }}"
+          no_log: true
+          with_items:
+            - "{{ postgres_db_users }}"
+          delegate_to: "{{ inventory_hostname }}"
+
+  when: not pg_init.stat.exists
+
+- name: Flush Handlers to force restart now if changes detected
+  meta: flush_handlers
+
+- name: ensuring socat is installed
+  package:
+    name: socat
+    state: present
+  when: 
+    - inventory_hostname in groups[spk|upper + '_' + dep_env|upper + '_' + 'postgres']
+  become: true
+
+- name: checking if haproxy is running
+  service:
+    name: haproxy
+    state: started
+  register: haproxy_service
+  when: 
+    - inventory_hostname in groups[spk|upper + '_' + dep_env|upper + '_' + 'postgres']
+  become: true
+
+- name: Check PostgreSQL Servers
+  shell: "echo 'show stat' | socat stdio /var/lib/haproxy/stats | grep -E ',UP' | awk -F, '{print $2}' | sed 's/BACKEND//'"   
+  register: haproxy_status
+  when: 
+    - inventory_hostname in groups[spk + '_' + dep_env + '_' + 'postgres'] 
+  ignore_errors: yes  
+  become: true
+  run_once: true     
+
+- name: Parse PostgreSQL Server Status
+  set_fact: 
+    pg_haproxy_serverlist_up: "{{ haproxy_status.stdout_lines }}"
+  when: 
+    - inventory_hostname in groups[spk + '_' + dep_env + '_' + 'postgres'] 
+  run_once: true  
+
+- name: Display FQDN of UP current leader
+  debug:
+    msg: "{{ pg_haproxy_serverlist_up }}"     
+  when: 
+    - inventory_hostname in groups[spk + '_' + dep_env + '_' + 'postgres'] 
+  run_once: true 
+
+- include_tasks:
+    file: failover.yml
+  when:
+    - inventory_hostname in pg_haproxy_serverlist_up
+
+- name: haproxy status
+  shell: echo "show stat -1 4 -1" | socat /var/lib/haproxy/stats stdio | tail -4| cut -d "," -f 2,18 | column -s, -t
+  register: haproxy_status_register
+  become: true
+
+- name: Display haproxy status
+  debug:
+    msg: "{{ haproxy_status_register.stdout_lines }}"     
+  when: 
+    - inventory_hostname in groups[spk + '_' + dep_env + '_' + 'postgres'] 
+  run_once: true 

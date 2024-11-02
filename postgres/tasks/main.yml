@@ -1,0 +1,26 @@
+---
+- name: Install postgres
+  import_tasks: install.yml
+  become: true
+  when: 
+    - not postgres_uninstall|bool
+    - not patroni_uninstall|bool
+    - not haproxy_uninstall|bool
+    - not consul_uninstall|bool
+  tags:
+    - postgres_install
+
+- name: "Configure postgres"
+  import_tasks: configure.yml
+  become: true
+  when: not postgres_rpm_only_install and not postgres_uninstall
+  tags:
+    - postgres_install
+    - postgres_configure
+
+- name: Uninstall postgres
+  import_tasks: uninstall.yml
+  become: true
+  when: postgres_uninstall|bool
+  tags:
+    - postgres_uninstall

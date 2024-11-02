@@ -1,0 +1,14 @@
+---
+- name: "Install HAProxy"
+  import_tasks: install.yml
+  become: true
+  when: not haproxy_uninstall|bool
+  tags:
+    - haproxy_install
+
+- name: "Uninstall HAProxy"
+  import_tasks: uninstall.yml
+  become: true
+  when: haproxy_uninstall|bool
+  tags:
+    - haproxy_uninstall

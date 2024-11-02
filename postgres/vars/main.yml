@@ -1,0 +1,7 @@
+
+application_user:
+  DEV: tfeopsd
+  UAT: tfeopsu
+  PROD: tfeopsp
+application_group: "tfe_{{env_group|lower}}_busp"
+artifactory_token: "{{artifactory_secret.artifactory_token}}"

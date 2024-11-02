@@ -1,0 +1,86 @@
+
+#---------------------------------------------------------------------
+# Global settings
+#---------------------------------------------------------------------
+global
+    log         {{ haproxy_global_log }}
+    chroot      {{ haproxy_chroot }}
+    pidfile     {{ haproxy_pidfile }}
+    maxconn     {{ haproxy_global_maxconn }}
+    user        {{ haproxy_user }}
+    group       {{ haproxy_group }}
+{% if haproxy_daemon|default(True) %}
+    daemon
+{% endif %}
+{% if haproxy_external_check|default(False) %}
+    external-check
+{% endif %}
+    # turn on stats unix socket
+    stats socket {{ haproxy_stats_socket }}
+
+#---------------------------------------------------------------------
+# common defaults that all the 'listen' and 'backend' sections will
+# use if not designated in their block
+#---------------------------------------------------------------------
+defaults
+    mode                    {{ haproxy_mode }}
+    log                     {{ haproxy_log }}
+{% if haproxy_options %}
+{% for option in haproxy_options %}
+    option                  {{ option }}
+{% endfor %}
+{% endif %}
+{% if haproxy_retries %}
+    retries                 {{ haproxy_retries }}
+{% endif %}
+{% if haproxy_timeout_http_request %}
+    timeout http-request    {{ haproxy_timeout_http_request }}
+{% endif %}
+{% if haproxy_timeout_queue %}
+    timeout queue           {{ haproxy_timeout_queue }}
+{% endif %}
+{% if haproxy_timeout_connect %}
+    timeout connect         {{ haproxy_timeout_connect }}
+{% endif %}
+{% if haproxy_timeout_client %}
+    timeout client          {{ haproxy_timeout_client }}
+{% endif %}
+{% if haproxy_timeout_server %}
+    timeout server          {{ haproxy_timeout_server }}
+{% endif %}
+{% if haproxy_timeout_http_keep_alive %}
+    timeout http-keep-alive {{ haproxy_timeout_http_keep_alive }}
+{% endif %}
+{% if haproxy_timeout_check %}
+    timeout check           {{ haproxy_timeout_check }}
+{% endif %}
+{% if haproxy_maxconn %}
+    maxconn                 {{ haproxy_maxconn }}
+{% endif %}
+
+{% for backend in haproxy_backends %}
+listen {{ backend.name }}
+  bind {{ backend.bind }}:{{ backend.port }}
+  mode {{ backend.mode }}
+{% if backend.additional_options %}
+{% for option in backend.additional_options %}
+  {{ option }}
+{% endfor %}
+{% endif %}
+{% if backend.balance %}
+  balance     {{ backend.balance }}
+{% endif %}
+{% for server in backend.servers %}
+  server  {{ server.name }} {{ server.ip }}:{{ server.port }} check {{ server.check }}
+{% endfor %}
+{% endfor %}
+
+{% if haproxy_stats_enable %}
+listen stats
+  bind *:{{ haproxy_stats_port }}
+  mode http
+  stats enable
+  stats uri /
+  stats refresh 5s
+  stats auth {{ haproxy_stats_auth }}
+{% endif %}

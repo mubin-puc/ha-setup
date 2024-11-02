@@ -1,0 +1,12 @@
+---
+################
+# Restart HAProxy
+################
+
+- name: Restart haproxy
+  systemd:
+    name: haproxy
+    state: restarted
+    daemon_reload: true
+  become: true
+  listen: "restart_haproxy"

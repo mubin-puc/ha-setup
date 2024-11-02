@@ -1,0 +1,10 @@
+---
+- name: "Uninstall haproxy RPM"
+  yum:
+    name: "haproxy"
+    state: absent
+
+- name: "Remove configuration dir"
+  file:
+    path: "{{ haproxy_config_dir }}"
+    state: absent

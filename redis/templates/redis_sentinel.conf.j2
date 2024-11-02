@@ -1,0 +1,52 @@
+# redis_sentinel {{ redis_version }} configuration file
+# sentinel_{{ redis_sentinel_port }}.conf
+
+daemonize {{ redis_daemonize }}
+protected-mode {{ redis_sentinel_protected_mode }}
+dir {{ redis_sentinel_dir }}
+pidfile {{ redis_sentinel_pidfile }}
+{% if redis_tls_enable -%}
+port 0
+tls-port {{ redis_sentinel_port }}
+tls-cert-file {{ redis_tls_cert_file }}
+tls-key-file {{ redis_tls_key_file }}
+tls-key-file-pass {{ redis_tls_key_file_pass }}
+tls-ca-cert-file {{ redis_tls_ca_cert_file }}
+tls-replication {{ redis_tls_replication }}
+tls-protocols {{ redis_tls_protocols }}
+{% else -%}
+port {{ redis_sentinel_port }}
+{% endif -%}
+{% if redis_bind -%}
+bind {{ redis_sentinel_bind }}
+{% endif -%}
+
+# Security
+{% if redis_sentinel_password %}
+requirepass {{ redis_sentinel_password }}
+{% endif %}
+
+{% for master in redis_sentinel_monitors -%}
+sentinel monitor {{ master.name }} {{ master.host }} {{ master.port }} {{ master.quorum|d('2') }}
+{% for option in ('auth_pass', 'down_after_milliseconds', 'parallel_syncs', 'failover_timeout', 'notification_script', 'client_reconfig_script') -%}
+{% if master[option] is defined and master[option] -%}
+sentinel {{ option|replace('_', '-') }} {{ master.name }} {{ master[option] }}
+{% endif %}
+{% endfor -%}
+{% for option in ('resolve-hostnames', 'announce-hostnames', 'announce-ip', 'replica-announce-ip') -%}
+{% if master[option] is defined and master[option] -%}
+sentinel {{ option|replace('_', '-') }} {{ master[option] }}
+{% endif %}
+{% endfor -%}
+{% if master['rename_commands'] is defined -%}
+{% for command in master['rename_commands'] -%}
+sentinel rename-command {{ master.name }} {{ command }}
+{% endfor -%}
+{% endif -%}
+{% endfor -%}
+
+logfile {{ redis_sentinel_logfile }}
+loglevel {{ redis_sentinel_loglevel }}
+syslog-enabled {{ redis_syslog_enabled }}
+syslog-ident {{ redis_sentinel_syslog_ident }}
+syslog-facility {{ redis_syslog_facility }}

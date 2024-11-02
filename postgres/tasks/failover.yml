@@ -1,0 +1,65 @@
+- name: >
+    Postgres High Availability Test
+  block:
+
+    - name: >
+        stopping postgres services host=[{{hostname_items}}]
+      service:
+        name: "{{postgres_services_items}}"
+        state: stopped
+      vars:
+        postgres_services: 
+          - consul
+          - node_exporter
+          - patroni
+          - postgresql_exporter
+      loop: "{{postgres_services}}"
+      loop_control:
+        loop_var: postgres_services_items
+      register: postgres_service_stop_register
+      become: true
+      
+    - name: haproxy status
+      shell: echo "show stat -1 4 -1" | socat /var/lib/haproxy/stats stdio | tail -4| cut -d "," -f 2,18 | column -s, -t
+      register: haproxy_status
+      until: 
+        - "'UP' in haproxy_status.stdout"
+        - "'UP 1/3' not in haproxy_status.stdout"
+      retries: 15
+      delay: 10
+      become: true
+
+    - name: starting postgres services host=[{{hostname_items}}]
+      service:
+        name: "{{postgres_services_items}}"
+        state: started
+      vars:
+        postgres_services: 
+          - consul
+          - node_exporter
+          - patroni
+          - postgresql_exporter
+      loop: "{{postgres_services}}"
+      loop_control:
+        loop_var: postgres_services_items
+      register: postgres_service_start_register
+      become: true
+
+  any_errors_fatal: false
+
+  rescue:
+    - name: starting postgres services host=[{{hostname_items}}]
+      service:
+        name: "{{postgres_services_items}}"
+        state: started
+      vars:
+        postgres_services: 
+          - consul
+          - node_exporter
+          - patroni
+          - postgresql_exporter
+      loop: "{{postgres_services}}"
+      loop_control:
+        loop_var: postgres_services_items
+      register: postgres_service_start_register
+      become: true

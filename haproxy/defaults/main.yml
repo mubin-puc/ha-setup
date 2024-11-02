@@ -1,0 +1,50 @@
+---
+haproxy_uninstall: false
+haproxy_config_dir: "/etc/haproxy"
+
+haproxy_stats_enable: true
+haproxy_stats_auth: "stats:stats"
+haproxy_stats_port: 8088
+
+#Config Globals
+haproxy_global_log: "127.0.0.1 local2"
+haproxy_chroot: "/var/lib/haproxy"
+haproxy_pidfile: "/var/run/haproxy.pid"
+haproxy_global_maxconn: 4000
+haproxy_user: "haproxy"
+haproxy_group: "haproxy"
+haproxy_daemon: true
+haproxy_stats_socket: "/var/lib/haproxy/stats"
+
+#Config Defaults
+haproxy_mode: "http"
+haproxy_log: "global"
+haproxy_options:
+haproxy_retries:
+haproxy_timeout_http_request: "10s"
+haproxy_timeout_queue:
+haproxy_timeout_connect: "10s"
+haproxy_timeout_client: "1m"
+haproxy_timeout_server: "1m"
+haproxy_timeout_http_keep_alive:
+haproxy_timeout_check: "10s"
+haproxy_maxconn:
+
+#Backend Config
+haproxy_backends:
+  - name: "default_app"
+    balance: "roundrobin"
+    bind: "*"
+    mode: tcp
+    port: 5000
+    additional_options:
+    servers:
+      - name: "app1"
+        ip: "{{ ansible_default_ipv4.address }}"
+        port: 5001
+        check: "port 5002"
+
+      - name: "app2"
+        ip: "ansible_default_ipv4.address }}"
+        port: 5002
+        check: "port 5002"

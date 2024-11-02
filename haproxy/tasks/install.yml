@@ -1,0 +1,62 @@
+---
+- name: Include Vault Secrets role
+  include_role:
+    name: vault_secrets
+
+- name: Set Artifact URL
+  set_fact:
+    artifact_url: "{{ base_artifact_url }}/haproxy/haproxy-{{ version }}-1.el8.x86_64.rpm"
+
+- name: Download and Install HAProxy
+  block:
+    - name: "Download HAProxy Package from Artifactory"
+      get_url:
+        url: "{{ artifact_url }}"
+        dest: "/tmp/{{ artifact_url.split('/')[-1] }}"
+        mode: "0755"
+        owner: "{{ haproxy_user }}"
+        group: "{{ haproxy_group }}"
+        headers:
+          X-JFrog-Art-Api: "{{ artifactory_token }}"
+        timeout: 380
+      retries: 5
+      delay: 5
+      no_log: false
+      register: artifactory_get_url_register
+      become: true
+
+    - name: Register downloaded artifact
+      set_fact:
+        downloaded_artifacts: "{{ [artifact_url.split('/')[-1]] + downloaded_artifacts | default([]) }}"
+
+- name: Install downloaded RPM package
+  yum:
+    name: "/tmp/{{ item }}"
+    state: present
+  loop: "{{ downloaded_artifacts }}"
+  loop_control:
+    label: "{{ item }}"
+  become: true
+
+- name: Deploy HAProxy Configuration
+  block:
+    - name: Install HAProxy configuration file
+      template:
+        src: haproxy.cfg.j2
+        dest: "{{ haproxy_config_dir }}/haproxy.cfg"
+        mode: "0400"
+        owner: "{{ haproxy_user }}"
+        group: "{{ haproxy_group }}"
+      notify: restart_haproxy
+
+    - name: Install HAProxy systemd service file
+      template:
+        src: haproxy.service.j2
+        dest: "/lib/systemd/system/haproxy.service"
+      notify: restart_haproxy
+
+- name: Ensure HAProxy Service is Enabled and Started
+  systemd:
+    name: haproxy
+    state: started
+    enabled: true

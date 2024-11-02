@@ -1,0 +1,47 @@
+---
+
+- name: Include HAProxy role for installation
+  include_role:
+    name: haproxy
+  vars:
+    haproxy_uninstall: false 
+  tags:
+    - haproxy
+  
+- name: Check if postgres package is on host
+  stat:
+    path: /usr/local/src/{{ postgres_rpms.0 }}
+  register: rpm_stat
+
+- name: Download RPMs from Artifactory if not present
+  get_url:
+    url: "{{ artifactory_postgres_url }}/{{ item }}.rpm"
+    dest: "/usr/local/src"
+    headers:
+      X-JFrog-Art-Api: "{{ artifactory_token }}"
+  register: postgres_rpm_artifactory
+  retries: 5
+  delay: 15
+  until: postgres_rpm_artifactory is succeeded
+  when: not rpm_stat.stat.exists
+  become: true
+  with_items:
+    - "{{ postgres_rpms }}"
+
+- name: Install postgres packages
+  yum:
+    name: "/usr/local/src/{{ item }}.rpm"
+    state: present
+    disable_gpg_check: true
+  register: postgres_install
+  become: true
+  with_items:
+    - "{{ postgres_rpms }}"
+
+- name: Ensure postgres bin is added to PATH
+  lineinfile:
+    path: "{{ postgres_user_profile }}"
+    line: "export PATH=$PATH:{{ postgres_bin_dir }}"
+    create: true
+  become: true
+  become_user: "{{ postgres_user }}"

@@ -1,0 +1,14 @@
+---
+- name: "restart redis"
+  service:
+    name: "{{ redis_service_name }}"
+    state: restarted
+  become: true
+  when: redis_as_service
+
+- name: "restart sentinel"
+  service:
+    name: sentinel_{{ redis_sentinel_port }}
+    state: restarted
+  become: true
+  when: redis_as_service

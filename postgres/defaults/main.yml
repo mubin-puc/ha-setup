@@ -1,0 +1,55 @@
+---
+postgres_uninstall: false
+postgres_rpm_only_install: true
+postgres_major_version: "15"
+postgres_version: "15.6-1"
+postgres_os: "rhel8"
+application_user:
+  DEV: tfeopsd
+  UAT: tfeopsu
+  PROD: tfeopsp
+application_group: "tfe_{{env_group|lower}}_busp"
+artifactory_postgres_url: "https://artifacts.horizon.bankofamerica.com/artifactory/ext-release-local-generic/com/baml/tfe/deployments/dependencies/postgresql/{{ postgres_version }}"
+postgres_db_users:
+  - db: "{{ postgres_app_db }}"
+    user: "{{ postgres_app_user }}"
+    pass: "{{ postgres_app_pass }}"
+postgres_rpms:
+  - "postgresql{{ postgres_major_version }}-libs-{{ postgres_version }}PGDG.{{ postgres_os }}.x86_64"
+  - "postgresql{{ postgres_major_version }}-{{ postgres_version }}PGDG.{{ postgres_os }}.x86_64"
+  - "postgresql{{ postgres_major_version }}-devel-{{ postgres_version }}PGDG.{{ postgres_os }}.x86_64"
+  - "postgresql{{ postgres_major_version }}-server-{{ postgres_version }}PGDG.{{ postgres_os }}.x86_64"
+  - "postgresql{{ postgres_major_version }}-contrib-{{ postgres_version }}PGDG.{{ postgres_os }}.x86_64"
+
+postgres_user_profile: "/var/lib/pgsql/.pgsql_profile"
+postgres_bin_dir: "/usr/pgsql-{{ postgres_major_version }}/bin"
+
+# Vars only used in full install (not RPM only)
+postgres_basedir: "{{ application_basedir }}/postgres"
+postgres_datadir: "{{ postgres_basedir }}/data"
+postgres_user: "{{ application_user[env_group|upper] }}"
+postgres_group: "{{ application_group }}"
+postgresql_exporter_user: "{{ application_user[env_group|upper] }}"
+postgresql_exporter_group: "{{ application_group }}"
+postgres_psycopg_rpm_name: python-psycopg2
+postgres_pip_exe: "pip2"
+postgres_python_bin: "{{ python2_bin }}"
+postgres_tmp_hash: !vault |
+          $ANSIBLE_VAULT;1.2;AES256;dev
+          31633735306664383432376161373666326361356335313930383165363935623333303838343133
+          3339653866636332663062363466646536633766376530610a313035616430663961653037343333
+          64326434623363663362306564663839303731326635313335646665373934316235376632313538
+          3735383132396562650a336332383662386464396634393837653063626566383162313263616235
+          65326639366266656466666339633064653265383638326438336433643238333032623536366635
+          64626538656537323961373433353638396433653132306564616564363264653764636531613132
+          34646232333836323539333530653461356135383066346236653665373038363238623363666163
+          62326563656361623333396461653763613332333138313032643866313839393836636435316630
+          38656438396635646264303762613838636263346263326633613137396337643930
+postgres_tmp_pass: !vault |
+          $ANSIBLE_VAULT;1.2;AES256;dev
+          61353138613137353637663864386266353033383666323837323066306461363966376565393462
+          3563623036386431313363623066653261353261373233390a303534383962633733653264653962
+          30393038623432633130623062356664643264623766623663386161633338366665323039663534
+          3163633738626536320a616132636633653762623630313131653763396261633065623337346661
+          33383738383332366333333538386337366337663330623264356463643862333339313464326131
+          3931326634663234653464373538386564636366663061656662

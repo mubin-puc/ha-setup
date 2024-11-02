@@ -1,0 +1,33 @@
+---
+# Environment-specific application user
+application_user:
+  DEV: tfeopsd
+  UAT: tfeopsu
+  PROD: tfeopsp
+
+# Application group based on environment
+application_group: "tfe_{{ env_group | lower }}_busp"
+
+# Environment (DEV, UAT, PROD) - dynamically set
+env_group: "DEV"  # Change as required per environment
+
+# Dynamic HAProxy user and group based on environment
+haproxy_user: "{{ application_user[env_group | upper] }}"
+haproxy_group: "{{ application_group }}"
+
+# HAProxy configuration directory
+haproxy_config_dir: "/etc/haproxy"
+
+# Artifactory base URL and version
+base_artifact_url: "https://artifacts.horizon.bankofamerica.com/artifactory/ext-release-local-generic/com/baml/tfe/deployments/dependencies"
+version: "2.9.10"  # Set the required version for HAProxy
+
+# Artifacts download settings
+artifacts_items:
+  mode: "755"  # Permissions for downloaded file
+  owner: "{{ haproxy_user }}"  # Owner of the downloaded file
+  group: "{{ haproxy_group }}"  # Group for the downloaded file
+
+# Temporary file path for downloads
+tempfile_register:
+  path: "/tmp/artifact_download"
